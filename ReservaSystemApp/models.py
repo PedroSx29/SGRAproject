@@ -121,7 +121,7 @@ class Reserva(models.Model):
         DisponibilidadParque,
         on_delete=models.CASCADE,
         related_name='reservas',
-        null=True,
+        null=True,  # Permitir valores nulos temporalmente
         default=None 
     )
     cantidadVisitantes = models.IntegerField()
@@ -153,9 +153,10 @@ class RegistroCambioReserva(models.Model):
     class Meta:
         db_table = 'registroCambioReserva'
 
-    def crear_notificacion(tipo, mensaje):
-        SistemaNotificaciones.objects.create(
-            fechaEnvio=timezone.now().date(),
-            tipo=tipo,
-            mensaje=mensaje
-        )
+def crear_notificacion(tipo, mensaje):
+    """Función para crear un registro de notificación (sistema de notificación)."""
+    SistemaNotificaciones.objects.create(
+        fechaEnvio=timezone.now().date(),
+        tipo=tipo,
+        mensaje=mensaje
+    )
