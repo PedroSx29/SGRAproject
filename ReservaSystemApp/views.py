@@ -9,7 +9,6 @@ from ReservaSystemApp.models import (
     RegistroCambioReserva, SistemaNotificaciones
 )
 
-# Helper function para el sistema de notificación (basado en models.py)
 def crear_notificacion(tipo, mensaje):
     """Crea un registro de notificación."""
     SistemaNotificaciones.objects.create(

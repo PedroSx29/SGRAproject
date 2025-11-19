@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils import timezone
-from django.contrib import messages
 
 # Create your models here.
 
@@ -153,10 +152,3 @@ class RegistroCambioReserva(models.Model):
     class Meta:
         db_table = 'registroCambioReserva'
 
-def crear_notificacion(tipo, mensaje):
-    """Función para crear un registro de notificación (sistema de notificación)."""
-    SistemaNotificaciones.objects.create(
-        fechaEnvio=timezone.now().date(),
-        tipo=tipo,
-        mensaje=mensaje
-    )
