@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from django.contrib import messages
 
 # Create your models here.
 
@@ -119,8 +121,8 @@ class Reserva(models.Model):
         DisponibilidadParque,
         on_delete=models.CASCADE,
         related_name='reservas',
-        null=True,  # Permitir valores nulos temporalmente
-        default=None  # Valor por defecto None
+        null=True,
+        default=None 
     )
     cantidadVisitantes = models.IntegerField()
     tipoVisita = models.ForeignKey(
@@ -137,3 +139,23 @@ class Reserva(models.Model):
 
     class Meta:
         db_table = 'reserva'
+
+class RegistroCambioReserva(models.Model):
+    idRegistro = models.AutoField(primary_key=True)
+    reserva = models.ForeignKey(Reserva, on_delete=models.CASCADE, related_name='registros_cambio')
+    fechaCambio = models.DateTimeField(default=timezone.now)
+    usuario = models.CharField(max_length=50) # Quién hizo el cambio (e.g., 'Administrador', 'Visitante')
+    descripcionCambio = models.TextField()
+
+    def __str__(self):
+        return f"Cambio en Reserva {self.reserva.idReserva} por {self.usuario} en {self.fechaCambio.strftime('%Y-%m-%d %H:%M')}"
+    
+    class Meta:
+        db_table = 'registroCambioReserva'
+
+    def crear_notificacion(tipo, mensaje):
+        SistemaNotificaciones.objects.create(
+            fechaEnvio=timezone.now().date(),
+            tipo=tipo,
+            mensaje=mensaje
+        )
