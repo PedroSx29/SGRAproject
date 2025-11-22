@@ -325,7 +325,10 @@ def guardarModificacionReserva(request, reserva_id):
             
     return redirect('validar_reserva')
 
+<<<<<<< HEAD
 @login_required 
+=======
+>>>>>>> 282fed02756e5eacef1454535be8030955115cc8
 def dashboardMonitoreo(request):
     # 1. Preparar filtros y datos
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -344,6 +347,7 @@ def dashboardMonitoreo(request):
 
     # 2. Cálculo de Métricas (Dashboard de Visualización)
     total_reservas = reservas_base.count()
+<<<<<<< HEAD
     
     # Aseguramos que el resultado de la agregación es un número, o 0 si es None
     total_visitantes = reservas_base.aggregate(Sum('cantidadVisitantes'))['cantidadVisitantes__sum'] or 0
@@ -366,6 +370,18 @@ def dashboardMonitoreo(request):
         porcentaje_ocupacion = round((total_visitantes_dec / capacidad_agregada_dec) * 100)
     else:
         porcentaje_ocupacion = 0
+=======
+    total_visitantes = reservas_base.aggregate(Sum('cantidadVisitantes'))['cantidadVisitantes__sum'] or 0
+    
+    # Capacidad Total del Parque para un rango de fechas (ejemplo simplificado)
+    capacidad_agregada = DisponibilidadParque.objects.filter(
+        fecha__gte=fecha_inicio or '2000-01-01', 
+        fecha__lte=fecha_fin or '2999-12-31'
+    ).aggregate(Sum('capacidadMaxima'))['capacidadMaxima__sum'] or 1
+    
+    # Evitar división por cero
+    porcentaje_ocupacion = round((total_visitantes / capacidad_agregada) * 100) if capacidad_agregada > 0 else 0
+>>>>>>> 282fed02756e5eacef1454535be8030955115cc8
 
     # 3. Alertas de Capacidad
     alertas = []
@@ -400,6 +416,7 @@ def dashboardMonitoreo(request):
     }
     
     return render(request, 'dashboard_monitoreo.html', context)
+<<<<<<< HEAD
 
 # --- Funciones de Autenticación (NUEVO) ---
 
@@ -432,3 +449,5 @@ def logout_admin(request):
     messages.info(request, "Sesión cerrada exitosamente.")
     # Redirige a la URL definida en settings.LOGOUT_REDIRECT_URL (inicio)
     return redirect('inicio')
+=======
+>>>>>>> 282fed02756e5eacef1454535be8030955115cc8

@@ -14,7 +14,10 @@ urlpatterns = [
     path('reserva/guardar-modificacion/<int:reserva_id>/', views.guardarModificacionReserva, name='guardar_modificacion_reserva'),
 
     path('monitoreo/dashboard/', views.dashboardMonitoreo, name='dashboard_monitoreo'),
+<<<<<<< HEAD
 
     path('admins/login/', views.login_admin, name='login_admin'),
     path('admins/logout/', views.logout_admin, name='logout_admin'),
+=======
+>>>>>>> 282fed02756e5eacef1454535be8030955115cc8
 ]
