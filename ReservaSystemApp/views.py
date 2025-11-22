@@ -1,9 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Sum, Count, Q
 from django.core.paginator import Paginator
 from django.db import connection
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import AuthenticationForm
+from decimal import Decimal # <--- NUEVA IMPORTACIÓN PARA CÁLCULOS PRECISOS
 from ReservaSystemApp.models import (
     DisponibilidadParque, Visitante, Acompañante, Reserva, TipoVisita,
     RegistroCambioReserva, SistemaNotificaciones
@@ -37,6 +42,10 @@ def mostrarDisponibilidad(request):
         # Obtener todas las disponibilidades y ordenarlas
         disponibilidades = DisponibilidadParque.objects.all().order_by('fecha', 'horaInicio')
         
+        # CALCULAR CUPOS DISPONIBLES EN LA VISTA
+        for disp in disponibilidades:
+            disp.cupos_disponibles = disp.capacidadMaxima - disp.capacidadActual
+        
         # Obtener tipos de visita
         tipos_visita = TipoVisita.objects.all().order_by('nombre')
         
@@ -61,17 +70,14 @@ def mostrarDisponibilidad(request):
 def guardarReserva(request):
     if request.method == 'POST':
         try:
-            # ... (código existente para guardar reserva) ...
-            # Esto debería ser el código original que ya tenías
-            # ...
             # Obtener datos del visitante principal
             visitante_data = {
                 'rut': request.POST.get('rut'),
                 'nombre': request.POST.get('nombre'),
+                'apellido': request.POST.get('apellido'), 
                 'telefono': request.POST.get('telefono'),
                 'correo': request.POST.get('correo'),
                 'edad': int(request.POST.get('edad')),
-                'apellido': '' # Deberías asegurarte de obtener el apellido si lo solicitas en el formulario
             }
 
             # Crear o actualizar visitante
@@ -86,18 +92,31 @@ def guardarReserva(request):
                 }
             )
 
-            # Procesar acompañantes
-            acompanantes = []
+            # Procesar acompañantes y CALCULAR CANTIDAD TOTAL DE VISITANTES
+            cantidad_visitantes = 1  # Inicia con el visitante principal
             i = 1
             while f'acompanante_rut_{i}' in request.POST:
-                # Omitiendo el código de acompañantes para brevedad, asumiendo que funciona
+                acompanante_data = {
+                    'rut': request.POST.get(f'acompanante_rut_{i}'),
+                    'nombre': request.POST.get(f'acompanante_nombre_{i}'),
+                    'edad': int(request.POST.get(f'acompanante_edad_{i}', 0))
+                }
+                
+                if acompanante_data['rut'] and acompanante_data['nombre']:
+                    # Crear el acompañante
+                    Acompañante.objects.create(
+                        rut=acompanante_data['rut'],
+                        rutVisitante=visitante,
+                        nombre=acompanante_data['nombre'],
+                        edad=acompanante_data['edad']
+                    )
+                    cantidad_visitantes += 1  # Sumar al acompañante
                 i += 1
             
-            cantidad_visitantes = int(request.POST.get('cantidadVisitantes', 1)) # Usar un campo oculto o calcular
-
             disponibilidad_id = request.POST.get('hora')
             disponibilidad = DisponibilidadParque.objects.get(id=disponibilidad_id)
 
+            # VERIFICACIÓN DE CAPACIDAD USANDO EL TOTAL CALCULADO
             if disponibilidad.capacidadActual + cantidad_visitantes > disponibilidad.capacidadMaxima:
                 messages.error(request, 'No hay suficiente capacidad para la cantidad de visitantes')
                 return redirect('form')
@@ -113,6 +132,7 @@ def guardarReserva(request):
                 estadoReserva=Reserva.Estado.ACTIVO
             )
 
+            # ACTUALIZACIÓN DE CAPACIDAD
             disponibilidad.capacidadActual += cantidad_visitantes
             disponibilidad.save()
 
@@ -126,8 +146,9 @@ def guardarReserva(request):
 
     return redirect('form')
 
+@login_required 
 def validarReserva(request):
-    # ... (código existente para validar reserva) ...
+    # ... (código para validar reserva) ...
     # Obtener parámetros de filtro
     fecha = request.GET.get('fecha')
     estado = request.GET.get('estado')
@@ -179,8 +200,6 @@ def validarReserva(request):
         
         # Para cada reserva, obtener los acompañantes
         for reserva in reservas_data:
-            # Nota: Usamos 'acompañante' en minúscula y sin tilde en SQL si la tabla se creó así
-            # Basado en models.py, debería ser 'acompañante'
             cursor.execute("""
                 SELECT rut, nombre, edad 
                 FROM acompañante 
@@ -206,10 +225,11 @@ def validarReserva(request):
     }
     
     return render(request, 'reservas.html', context)
-# ... (código existente para confirmar_reserva y cancelar_reserva - no mostrado por brevedad) ...
+# ... (código existente para confirmar_reserva y cancelar_reserva - omitido por brevedad) ...
 
-# --- Vistas para el Módulo de Reajuste ---
+# --- Vistas para el Módulo de Reajuste (Admin) ---
 
+@login_required 
 def modificarReserva(request, reserva_id):
     """Muestra el formulario para modificar una reserva existente (interfaz de modificación)."""
     reserva = get_object_or_404(Reserva, idReserva=reserva_id)
@@ -230,6 +250,7 @@ def modificarReserva(request, reserva_id):
     }
     return render(request, 'modificar_reserva.html', context)
 
+@login_required 
 @transaction.atomic
 def guardarModificacionReserva(request, reserva_id):
     """Procesa la modificación de la reserva (control de disponibilidad y registro de cambios)."""
@@ -244,7 +265,8 @@ def guardarModificacionReserva(request, reserva_id):
             # 1. Obtener nuevos datos del formulario
             new_disponibilidad_id = request.POST.get('hora')
             new_tipo_visita_nombre = request.POST.get('tipoVisita')
-            new_cantidad_visitantes = int(request.POST.get('cantidadVisitantes')) # Asumiendo que se envía en un campo oculto o se calcula en la plantilla
+            # La cantidad de visitantes no cambia en la modificación, se reusa el valor original
+            new_cantidad_visitantes = old_cantidad_visitantes 
             
             new_disponibilidad = DisponibilidadParque.objects.get(id=new_disponibilidad_id)
             new_tipo_visita = TipoVisita.objects.get(nombre=new_tipo_visita_nombre)
@@ -279,7 +301,7 @@ def guardarModificacionReserva(request, reserva_id):
             descripcion = f"Modificación. Fecha/Hora de {old_disponibilidad} a {new_disponibilidad}. Tipo de {old_tipo_visita.nombre} a {new_tipo_visita.nombre}. Cantidad de {old_cantidad_visitantes} a {new_cantidad_visitantes} visitantes."
             RegistroCambioReserva.objects.create(
                 reserva=reserva,
-                usuario='Administrador', # Se puede cambiar por el usuario logueado o 'Visitante'
+                usuario='Administrador',
                 descripcionCambio=descripcion
             )
             
@@ -287,7 +309,7 @@ def guardarModificacionReserva(request, reserva_id):
             crear_notificacion('Reserva Modificada', f'Reserva {reserva_id} reajustada por el administrador.')
 
             messages.success(request, f'La reserva {reserva_id} ha sido modificada exitosamente.')
-            return redirect('validar_reserva') # Redirigir a la lista de validación
+            return redirect('validar_reserva')
 
         except Exception as e:
             # Revertir cualquier cambio de capacidad si falla
@@ -296,17 +318,117 @@ def guardarModificacionReserva(request, reserva_id):
                     old_disponibilidad.capacidadActual += old_cantidad_visitantes
                     old_disponibilidad.save()
             except Exception:
-                pass # Ignorar errores de reversión si fallan
+                pass
 
             messages.error(request, f'Error al guardar la modificación: {str(e)}')
             return redirect('modificar_reserva', reserva_id=reserva_id)
             
     return redirect('validar_reserva')
 
-def confirmar_reserva(request, reserva_id):
-# ... (código existente - no mostrado por brevedad) ...
-    pass # Mantener la función original aquí.
+@login_required 
+def dashboardMonitoreo(request):
+    # 1. Preparar filtros y datos
+    fecha_inicio = request.GET.get('fecha_inicio')
+    fecha_fin = request.GET.get('fecha_fin')
+    tipo_visita_filtro = request.GET.get('tipo_visita')
+    
+    # Base de la consulta: solo reservas activas (o activas/utilizadas)
+    reservas_base = Reserva.objects.filter(estadoReserva__in=[Reserva.Estado.ACTIVO, Reserva.Estado.UTILIZADO])
+    
+    if fecha_inicio:
+        reservas_base = reservas_base.filter(disponibilidad__fecha__gte=fecha_inicio)
+    if fecha_fin:
+        reservas_base = reservas_base.filter(disponibilidad__fecha__lte=fecha_fin)
+    if tipo_visita_filtro:
+        reservas_base = reservas_base.filter(tipoVisita__nombre=tipo_visita_filtro)
 
-def cancelar_reserva(request, reserva_id):
-# ... (código existente - no mostrado por brevedad) ...
-    pass # Mantener la función original aquí.
+    # 2. Cálculo de Métricas (Dashboard de Visualización)
+    total_reservas = reservas_base.count()
+    
+    # Aseguramos que el resultado de la agregación es un número, o 0 si es None
+    total_visitantes = reservas_base.aggregate(Sum('cantidadVisitantes'))['cantidadVisitantes__sum'] or 0
+    
+    # Capacidad Total del Parque para un rango de fechas
+    capacidad_data = DisponibilidadParque.objects.filter(
+        fecha__gte=fecha_inicio or '2000-01-01', 
+        fecha__lte=fecha_fin or '2999-12-31'
+    ).aggregate(Sum('capacidadMaxima'))['capacidadMaxima__sum']
+    
+    # Aseguramos que capacidad_agregada es un número, o 0 si no hay registros
+    capacidad_agregada = capacidad_data or 0
+    
+    # CÁLCULO DEL PORCENTAJE DE OCUPACIÓN (UTILIZANDO DECIMAL Y VERIFICACIÓN)
+    if capacidad_agregada > 0:
+        # Convertimos ambos valores a Decimal para una división precisa
+        total_visitantes_dec = Decimal(total_visitantes)
+        capacidad_agregada_dec = Decimal(capacidad_agregada)
+        
+        porcentaje_ocupacion = round((total_visitantes_dec / capacidad_agregada_dec) * 100)
+    else:
+        porcentaje_ocupacion = 0
+
+    # 3. Alertas de Capacidad
+    alertas = []
+    if porcentaje_ocupacion > 80:
+        alertas.append("ALERTA: Ocupación alta. Más del 80% de la capacidad reservada en el período seleccionado.")
+        crear_notificacion('ALERTA DE CAPACIDAD', f'Ocupación del parque al {porcentaje_ocupacion}% en el periodo monitoreado.')
+    
+    # 4. Generación de Informe (Simulado)
+    if 'generar_informe' in request.GET:
+        # Aquí iría la lógica compleja para generar un PDF o Excel
+        messages.success(request, f'Informe automático generado. Total de visitantes: {total_visitantes}.')
+    
+    # Datos para la tabla de detalle (Top 5 fechas con más visitantes)
+    top_fechas = reservas_base.values(
+        'disponibilidad__fecha'
+    ).annotate(
+        count=Sum('cantidadVisitantes')
+    ).order_by('-count')[:5]
+
+    context = {
+        'total_reservas': total_reservas,
+        'total_visitantes': total_visitantes,
+        'porcentaje_ocupacion': porcentaje_ocupacion,
+        'top_fechas': top_fechas,
+        'tipos_visita': TipoVisita.objects.all().order_by('nombre'),
+        'filtros': {
+            'fecha_inicio': fecha_inicio,
+            'fecha_fin': fecha_fin,
+            'tipo_visita': tipo_visita_filtro
+        },
+        'alertas': alertas
+    }
+    
+    return render(request, 'dashboard_monitoreo.html', context)
+
+# --- Funciones de Autenticación (NUEVO) ---
+
+def login_admin(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            
+            # Solo permitir el acceso si el usuario existe Y es un staff/superuser (Administrador)
+            if user is not None and user.is_active and (user.is_staff or user.is_superuser):
+                login(request, user)
+                messages.success(request, f"Bienvenido, {username}. Acceso de Administrador concedido.")
+                # Redirige a la URL definida en settings.LOGIN_REDIRECT_URL (dashboard_monitoreo)
+                return redirect('dashboard_monitoreo')
+            else:
+                messages.error(request, "Usuario o contraseña inválidos o el usuario no tiene permisos de administrador.")
+        else:
+            messages.error(request, "Error en el formulario. Por favor, verifique sus credenciales.")
+    else:
+        form = AuthenticationForm()
+
+    return render(request, 'login_admin.html', {'form': form})
+
+@login_required 
+def logout_admin(request):
+    logout(request)
+    messages.info(request, "Sesión cerrada exitosamente.")
+    # Redirige a la URL definida en settings.LOGOUT_REDIRECT_URL (inicio)
+    return redirect('inicio')

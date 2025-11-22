@@ -57,7 +57,8 @@ class DocumentoAcceso(models.Model):
         db_table = 'documentoAcceso'
     
 class Visitante(models.Model):
-    rut = models.CharField(max_length=11, primary_key=True)
+    idVisitante = models.AutoField(primary_key=True)
+    rut = models.CharField(max_length=11) 
     nombre = models.CharField(max_length=30)
     apellido = models.CharField(max_length=30)
     telefono = models.CharField(max_length=15)
@@ -93,7 +94,8 @@ class TipoVisita(models.Model):
         db_table = 'tipoVisita'
     
 class Acompañante(models.Model):
-    rut = models.CharField(max_length=11, primary_key=True)
+    idAcompañante = models.AutoField(primary_key=True)
+    rut = models.CharField(max_length=11)
     rutVisitante = models.ForeignKey(Visitante, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=60)
     edad = models.IntegerField()
@@ -129,7 +131,6 @@ class Reserva(models.Model):
         on_delete=models.CASCADE,
         related_name='reservas',
         null=True,
-        to_field='nombre'
     )
     estadoReserva = models.CharField(max_length=30, choices=Estado.choices, default=Estado.ACTIVO)
 

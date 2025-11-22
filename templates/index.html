@@ -1,28 +1,123 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>SGRA - Sistema de Gestión de Reservas Angostura</title>
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
-    <script src="{% static 'js/bootstrap.bundle.js' %}"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f0f2f5; /* Un fondo gris suave y moderno */
+        }
+        .navbar {
+            background-color: #1a202c !important; /* Navbar oscuro (casi negro) para contraste */
+        }
+        .btn-reserve-nav {
+            background-color: #4CAF50; /* Verde vibrante para CTA principal */
+            border-color: #4CAF50;
+            color: white;
+            transition: transform 0.2s;
+        }
+        .btn-reserve-nav:hover {
+            background-color: #45a049;
+            border-color: #45a049;
+            transform: translateY(-2px);
+        }
+        .card-modern {
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra elegante */
+        }
+    </style>
 </head>
 
 <body>
-    <h1 class="display-4 alert alert-primary text-center">Prototipo SGRA</h1>
-    {% block contenido %}
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-lg">
         <div class="container">
-            <div class="text-center mt-3">
-                <a href="{% url 'form' %}" class="btn btn-success">Reserva</a>
-            </div>
-            <div class="text-center mt-2">
-                <a href="{% url 'valreserva' %}" class="btn btn-warning">Validacion de Reserva</a>
+            <a class="navbar-brand fw-bold" href="{% url 'inicio' %}">
+                <i class="fas fa-mountain"></i> SGRA Angostura
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item me-3">
+                        <a class="nav-link btn btn-reserve-nav px-4" href="{% url 'form' %}">
+                            <i class="fas fa-calendar-alt"></i> Realizar Reserva
+                        </a>
+                    </li>
+                </ul>
+
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item me-3">
+                            <a class="nav-link" href="{% url 'validar_reserva' %}" title="Validación y Gestión de Reservas">
+                                <i class="fas fa-check-circle"></i> Gestión de Reservas
+                            </a>
+                        </li>
+                        <li class="nav-item me-4">
+                            <a class="nav-link" href="{% url 'dashboard_monitoreo' %}" title="Monitoreo y Estadísticas">
+                                <i class="fas fa-chart-line"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item d-flex align-items-center">
+                            <span class="navbar-text me-3 text-white-50">
+                                <i class="fas fa-user-circle"></i> {{ user.username|default:"Admin" }}
+                            </span>
+                            <a class="btn btn-outline-danger btn-sm" href="{% url 'logout_admin' %}"> <i class="fas fa-sign-out-alt"></i> Salir
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="btn btn-outline-light btn-sm" href="{% url 'login_admin' %}"> <i class="fas fa-sign-in-alt"></i> Acceso Admin
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
             </div>
         </div>
-    {% endblock contenido %}
+    </nav>
+    
+    <div class="container py-5">
+        {% block contenido %}
+            <h1 class="display-4 text-center mb-5 fw-bold text-dark">Sistema de Gestión de Reservas Angostura</h1>
+            <div class="row justify-content-center">
+                <div class="col-md-9">
+                    <div class="card card-modern text-center">
+                        <div class="card-body py-5 px-md-5">
+                            <i class="fas fa-leaf fa-5x text-success mb-4"></i>
+                            <h5 class="card-title fs-3 mb-4 fw-light">Tu aventura en la naturaleza comienza aquí.</h5>
+                            <p class="card-text text-muted mb-4">
+                                Reserva tu cupo para visitar nuestro parque. Asegura tu acceso a la fecha y hora de tu preferencia.
+                            </p>
+                            <a href="{% url 'form' %}" class="btn btn-reserve-nav btn-lg shadow-sm">
+                                <i class="fas fa-ticket-alt"></i> ¡Quiero Reservar!
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if not user.is_authenticated %}
+            <div class="row justify-content-center mt-5">
+                <div class="col-md-9 text-center">
+                    <p class="text-secondary small">
+                        <i class="fas fa-lock"></i> Módulos de administración restringidos. Si eres administrador, utiliza el enlace **"Acceso Admin"** en el menú.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
 
+        {% endblock contenido %}
+    </div>
+
+    <script src="{% static 'js/bootstrap.bundle.js' %}"></script>
 </body>
 
 </html>

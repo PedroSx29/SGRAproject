@@ -12,4 +12,9 @@ urlpatterns = [
 
     path('reserva/modificar/<int:reserva_id>/', views.modificarReserva, name='modificar_reserva'),
     path('reserva/guardar-modificacion/<int:reserva_id>/', views.guardarModificacionReserva, name='guardar_modificacion_reserva'),
+
+    path('monitoreo/dashboard/', views.dashboardMonitoreo, name='dashboard_monitoreo'),
+
+    path('admins/login/', views.login_admin, name='login_admin'),
+    path('admins/logout/', views.logout_admin, name='logout_admin'),
 ]
