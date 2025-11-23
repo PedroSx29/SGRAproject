@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.forms import AuthenticationForm
-from decimal import Decimal # <--- NUEVA IMPORTACIÓN PARA CÁLCULOS PRECISOS
+from decimal import Decimal 
 from ReservaSystemApp.models import (
     DisponibilidadParque, Visitante, Acompañante, Reserva, TipoVisita,
     RegistroCambioReserva, SistemaNotificaciones
@@ -80,16 +80,15 @@ def guardarReserva(request):
                 'edad': int(request.POST.get('edad')),
             }
 
-            # Crear o actualizar visitante
-            visitante, created = Visitante.objects.update_or_create(
+            # --- CAMBIO CLAVE 1: CREAR NUEVO VISITANTE EN LUGAR DE ACTUALIZAR ---
+            # Si el RUT ya no es PK, siempre creamos un nuevo visitante por reserva (sistema de invitados).
+            visitante = Visitante.objects.create(
                 rut=visitante_data['rut'],
-                defaults={
-                    'nombre': visitante_data['nombre'],
-                    'apellido': visitante_data['apellido'],
-                    'telefono': visitante_data['telefono'],
-                    'correo': visitante_data['correo'],
-                    'edad': visitante_data['edad']
-                }
+                nombre=visitante_data['nombre'],
+                apellido=visitante_data['apellido'],
+                telefono=visitante_data['telefono'],
+                correo=visitante_data['correo'],
+                edad=visitante_data['edad']
             )
 
             # Procesar acompañantes y CALCULAR CANTIDAD TOTAL DE VISITANTES
@@ -103,10 +102,10 @@ def guardarReserva(request):
                 }
                 
                 if acompanante_data['rut'] and acompanante_data['nombre']:
-                    # Crear el acompañante
+                    # Crear el acompañante (rutVisitante ahora es una FK a Visitante.idVisitante)
                     Acompañante.objects.create(
                         rut=acompanante_data['rut'],
-                        rutVisitante=visitante,
+                        rutVisitante=visitante, # Visitante es la instancia recién creada
                         nombre=acompanante_data['nombre'],
                         edad=acompanante_data['edad']
                     )
@@ -148,20 +147,21 @@ def guardarReserva(request):
 
 @login_required 
 def validarReserva(request):
-    # ... (código para validar reserva) ...
     # Obtener parámetros de filtro
     fecha = request.GET.get('fecha')
     estado = request.GET.get('estado')
     page_number = request.GET.get('page', 1)
     
-    # Construir query base con los nombres correctos de tablas y columnas
+    # --- AJUSTE DE CONSULTA SQL: Eliminamos la unión a TipoVisita para evitar el error 1292.
+    # El valor del nombre de la visita ya está en r.tipoVisita_id.
+    
     query = """
         SELECT 
             r.idReserva,
-            r.visitante_id as visitante_rut,
+            r.visitante_id,              /* La FK es el nuevo ID (Visitante.idVisitante) */
+            v.rut as visitante_rut,      /* Obtenemos el RUT del visitante para mostrar */
             r.disponibilidad_id,
             r.cantidadVisitantes,
-            r.tipoVisita_id,
             r.estadoReserva,
             v.nombre as visitante_nombre,
             v.apellido as visitante_apellido,
@@ -170,12 +170,13 @@ def validarReserva(request):
             d.fecha as disponibilidad_fecha,
             d.horaInicio,
             d.horaFin,
-            tv.nombre as tipo_visita_nombre
+            /* Renombramos la FK de tipo visita para obtener el nombre de la visita */
+            r.tipoVisita_id as tipo_visita_nombre
         FROM reserva r
-        INNER JOIN visitante v ON r.visitante_id = v.rut
+        /* La unión se hace usando r.visitante_id (FK) = v.idVisitante (Nuevo PK) */
+        INNER JOIN visitante v ON r.visitante_id = v.idVisitante
         INNER JOIN disponibilidadParque d ON r.disponibilidad_id = d.id
-        INNER JOIN tipoVisita tv ON r.tipoVisita_id = tv.nombre
-        WHERE 1=1
+        WHERE 1=1 /* Eliminamos la unión a tipoVisita que causaba el error 1292 */
     """
     
     params = []
@@ -200,17 +201,22 @@ def validarReserva(request):
         
         # Para cada reserva, obtener los acompañantes
         for reserva in reservas_data:
+            # Necesitamos usar el PK real (idVisitante) de la tabla visitante para buscar acompañantes
+            visitante_pk_id = reserva['visitante_id'] 
+            
             cursor.execute("""
                 SELECT rut, nombre, edad 
                 FROM acompañante 
-                WHERE rutVisitante_id = %s
-            """, [reserva['visitante_rut']])
+                /* La búsqueda se hace por el ID del visitante, no por el RUT */
+                WHERE rutVisitante_id = %s 
+            """, [visitante_pk_id])
             
             acompanantes_columns = [col[0] for col in cursor.description]
             reserva['acompanantes'] = [
                 dict(zip(acompanantes_columns, row)) 
                 for row in cursor.fetchall()
             ]
+
     
     # Paginación
     paginator = Paginator(reservas_data, 10)  # 10 reservas por página
@@ -225,7 +231,6 @@ def validarReserva(request):
     }
     
     return render(request, 'reservas.html', context)
-# ... (código existente para confirmar_reserva y cancelar_reserva - omitido por brevedad) ...
 
 # --- Vistas para el Módulo de Reajuste (Admin) ---
 
@@ -325,10 +330,7 @@ def guardarModificacionReserva(request, reserva_id):
             
     return redirect('validar_reserva')
 
-<<<<<<< HEAD
 @login_required 
-=======
->>>>>>> 282fed02756e5eacef1454535be8030955115cc8
 def dashboardMonitoreo(request):
     # 1. Preparar filtros y datos
     fecha_inicio = request.GET.get('fecha_inicio')
@@ -347,7 +349,6 @@ def dashboardMonitoreo(request):
 
     # 2. Cálculo de Métricas (Dashboard de Visualización)
     total_reservas = reservas_base.count()
-<<<<<<< HEAD
     
     # Aseguramos que el resultado de la agregación es un número, o 0 si es None
     total_visitantes = reservas_base.aggregate(Sum('cantidadVisitantes'))['cantidadVisitantes__sum'] or 0
@@ -370,18 +371,6 @@ def dashboardMonitoreo(request):
         porcentaje_ocupacion = round((total_visitantes_dec / capacidad_agregada_dec) * 100)
     else:
         porcentaje_ocupacion = 0
-=======
-    total_visitantes = reservas_base.aggregate(Sum('cantidadVisitantes'))['cantidadVisitantes__sum'] or 0
-    
-    # Capacidad Total del Parque para un rango de fechas (ejemplo simplificado)
-    capacidad_agregada = DisponibilidadParque.objects.filter(
-        fecha__gte=fecha_inicio or '2000-01-01', 
-        fecha__lte=fecha_fin or '2999-12-31'
-    ).aggregate(Sum('capacidadMaxima'))['capacidadMaxima__sum'] or 1
-    
-    # Evitar división por cero
-    porcentaje_ocupacion = round((total_visitantes / capacidad_agregada) * 100) if capacidad_agregada > 0 else 0
->>>>>>> 282fed02756e5eacef1454535be8030955115cc8
 
     # 3. Alertas de Capacidad
     alertas = []
@@ -416,7 +405,6 @@ def dashboardMonitoreo(request):
     }
     
     return render(request, 'dashboard_monitoreo.html', context)
-<<<<<<< HEAD
 
 # --- Funciones de Autenticación (NUEVO) ---
 
@@ -449,5 +437,3 @@ def logout_admin(request):
     messages.info(request, "Sesión cerrada exitosamente.")
     # Redirige a la URL definida en settings.LOGOUT_REDIRECT_URL (inicio)
     return redirect('inicio')
-=======
->>>>>>> 282fed02756e5eacef1454535be8030955115cc8
