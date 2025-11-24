@@ -54,11 +54,11 @@
                                 <div class="invalid-feedback">Por favor ingrese su apellido.</div>
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label for="edad" class="form-label">Edad</label>
-                                <input type="number" class="form-control" id="edad" name="edad" min="1" required>
-                                <div class="invalid-feedback">Por favor ingrese su edad.</div>
+                                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" max="{{ "now"|date:"Y-m-d" }}" required>
+                                <div class="invalid-feedback">Por favor ingrese su fecha de nacimiento.</div>
                             </div>
-                        </div>
+                            </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="telefono" class="form-label">Teléfono</label>
@@ -145,41 +145,44 @@
     </div>
 
     <script>
-        let acompananteCount = 0;
+        let acompananteCount = 0
 
         function actualizarCantidadVisitantes() {
-            const numAcompanantes = document.querySelectorAll('#acompanantesContainer .acompanante-card').length;
-            // Visitante principal (1) + Acompañantes
-            document.getElementById('cantidadVisitantesInput').value = numAcompanantes + 1;
+            const numAcompanantes = document.querySelectorAll('#acompanantesContainer .acompanante-card').length
+            document.getElementById('cantidadVisitantesInput').value = numAcompanantes + 1
         }
 
         function actualizarIndicesAcompanantes() {
-            const cards = document.querySelectorAll('#acompanantesContainer .acompanante-card');
-            acompananteCount = 0;
+            const cards = document.querySelectorAll('#acompanantesContainer .acompanante-card')
+            acompananteCount = 0
 
             cards.forEach((card, index) => {
-                const newIndex = index + 1;
-                card.querySelector('.card-title').textContent = `Acompañante ${newIndex}`;
+                const newIndex = index + 1
+                card.querySelector('.card-title').textContent = `Acompañante ${newIndex}`
                 
                 card.querySelectorAll('input').forEach(input => {
-                    const name = input.getAttribute('name');
+                    const name = input.getAttribute('name')
                     if (name.includes('acompanante_rut')) {
-                        input.setAttribute('name', `acompanante_rut_${newIndex}`);
+                        input.setAttribute('name', `acompanante_rut_${newIndex}`)
                     } else if (name.includes('acompanante_nombre')) {
-                        input.setAttribute('name', `acompanante_nombre_${newIndex}`);
+                        input.setAttribute('name', `acompanante_nombre_${newIndex}`)
+                    } else if (name.includes('acompanante_fecha_nacimiento')) { 
+                        input.setAttribute('name', `acompanante_fecha_nacimiento_${newIndex}`)
                     } else if (name.includes('acompanante_edad')) {
-                        input.setAttribute('name', `acompanante_edad_${newIndex}`);
+                        input.setAttribute('name', `acompanante_fecha_nacimiento_${newIndex}`)
                     }
-                });
+                })
                 
-                acompananteCount = newIndex;
-            });
-            actualizarCantidadVisitantes(); // Recalcular la cantidad total después de re-indexar
+                acompananteCount = newIndex
+            })
+            actualizarCantidadVisitantes()
         }
 
         function agregarAcompananteHandler() {
-            acompananteCount++;
-            const container = document.getElementById('acompanantesContainer');
+            acompananteCount++
+            const container = document.getElementById('acompanantesContainer')
+            
+            const today = new Date().toISOString().split('T')[0]
             
             const acompananteHTML = `
                 <div class="card card-body bg-light mb-3 shadow-sm acompanante-card">
@@ -201,24 +204,22 @@
                             <div class="invalid-feedback">Nombre es requerido.</div>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label class="form-label small">Edad</label>
-                            <input type="number" class="form-control" name="acompanante_edad_${acompananteCount}" min="1" required>
-                            <div class="invalid-feedback">Edad es requerida.</div>
+                            <label class="form-label small">Fecha de Nacimiento</label>
+                            <input type="date" class="form-control" name="acompanante_fecha_nacimiento_${acompananteCount}" max="${today}" required>
+                            <div class="invalid-feedback">Fecha de Nacimiento requerida.</div>
                         </div>
                     </div>
                 </div>
-            `;
+            `
             
-            container.insertAdjacentHTML('beforeend', acompananteHTML);
-            actualizarCantidadVisitantes(); // Recalcular la cantidad total
+            container.insertAdjacentHTML('beforeend', acompananteHTML)
+            actualizarCantidadVisitantes()
         }
         
-        document.getElementById('agregarAcompanante').addEventListener('click', agregarAcompananteHandler);
+        document.getElementById('agregarAcompanante').addEventListener('click', agregarAcompananteHandler)
 
-        // Inicializar y validar la cantidad de visitantes al cargar la página
-        actualizarCantidadVisitantes(); 
+        actualizarCantidadVisitantes()
 
-        // Validación de Bootstrap
         (function () {
             'use strict'
             var forms = document.querySelectorAll('.needs-validation')

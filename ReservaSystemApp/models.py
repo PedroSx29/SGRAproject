@@ -63,7 +63,7 @@ class Visitante(models.Model):
     apellido = models.CharField(max_length=30)
     telefono = models.CharField(max_length=15)
     correo = models.CharField(max_length=35)
-    edad = models.IntegerField()
+    fecha_nacimiento = models.DateField(null=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} - RUT: {self.rut}"
@@ -98,7 +98,7 @@ class Acompañante(models.Model):
     rut = models.CharField(max_length=11)
     rutVisitante = models.ForeignKey(Visitante, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=60)
-    edad = models.IntegerField()
+    fecha_nacimiento = models.DateField(null=True)
 
     def __str__(self):
         return f"{self.nombre} - RUT: {self.rut}"
@@ -122,7 +122,7 @@ class Reserva(models.Model):
         DisponibilidadParque,
         on_delete=models.CASCADE,
         related_name='reservas',
-        null=True,  # Permitir valores nulos temporalmente
+        null=True,
         default=None 
     )
     cantidadVisitantes = models.IntegerField()
@@ -144,7 +144,7 @@ class RegistroCambioReserva(models.Model):
     idRegistro = models.AutoField(primary_key=True)
     reserva = models.ForeignKey(Reserva, on_delete=models.CASCADE, related_name='registros_cambio')
     fechaCambio = models.DateTimeField(default=timezone.now)
-    usuario = models.CharField(max_length=50) # Quién hizo el cambio (e.g., 'Administrador', 'Visitante')
+    usuario = models.CharField(max_length=50)
     descripcionCambio = models.TextField()
 
     def __str__(self):
